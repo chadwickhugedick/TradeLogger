@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade Results</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Cyberpunk 2077 (Yellow/Cyan) -->
+    <!-- Application Structure Plan: Elevate the "Performance Metrics" to the top of the page for a high-level dashboard view. Below this, retain the two-column layout for detailed interaction: Left for trade logging (with enhanced multi-paste) and the trade log table, Right for visual chart analysis. This structure prioritizes immediate KPI visibility while keeping data entry and deep analysis organized and accessible, fitting a trader's workflow. -->
+    <!-- Visualization & Content Choices: 
+        - Multi-Trade Paste -> Goal: Rapid Data Entry -> Method: Textarea with enhanced JS parsing -> Interaction: User pastes multiple trade blocks. The app splits the text by 'Index' and logs each trade individually. Justification: Massively improves logging efficiency.
+        - Themed UI -> Goal: Engagement/Aesthetics -> Method: Full CSS overhaul -> Interaction: A dark, neon-accented 'cyberpunk' theme is applied to all elements, including charts, for a more immersive experience.
+        - KPI Metrics -> Goal: Inform -> Method: KPI cards (redesigned) -> Interaction: Real-time updates with a high-tech visual style.
+        - All other elements (charts, tables) are restyled to match the new theme but retain their core interactive functions.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { 
+            font-family: 'Roboto Mono', monospace;
+            background-color: #0d1117;
+            color: #e6edf3;
+            background-image: linear-gradient(rgba(13, 23, 33, 0.85), rgba(13, 23, 33, 0.85)), url('mdvmefeejg331.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0d1117; }
+        ::-webkit-scrollbar-thumb { background: #fcee0a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d8c900; }
+        .cyber-card {
+             background-color: rgba(13, 23, 33, 0.8);
+             border: 1px solid #484f58;
+             backdrop-filter: blur(5px);
+        }
+        .kpi-label { font-size: 0.875rem; font-weight: 500; color: #b1bac4; }
+        .kpi-value { font-size: 1.75rem; font-weight: 700; }
+        .tab-btn { transition: color 0.2s, border-color 0.2s; }
+        .cyber-input {
+            background-color: #010409;
+            border: 1px solid #484f58;
+            color: #f0f6fc;
+        }
+        .cyber-input::placeholder {
+            color: #586069;
+        }
+        .cyber-input:focus {
+            outline: none;
+            border-color: #fcee0a;
+            box-shadow: 0 0 10px rgba(252, 238, 10, 0.5);
+        }
+        .cyber-btn {
+            background-color: #fcee0a;
+            color: #0d1117;
+            text-shadow: none;
+            border: 1px solid #fcee0a;
+            font-weight: 700;
+        }
+        .cyber-btn:hover {
+            background-color: rgba(252, 238, 10, 0.1);
+            color: #fcee0a;
+        }
+        .cyber-btn-secondary {
+            background-color: transparent;
+            color: #00f0ff;
+            border: 1px solid #00f0ff;
+        }
+        .cyber-btn-secondary:hover {
+            background-color: rgba(0, 240, 255, 0.1);
+        }
+        .cyber-checkbox {
+            appearance: none;
+            background-color: #010409;
+            border: 1px solid #484f58;
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            position: relative;
+        }
+        .cyber-checkbox:checked {
+            background-color: #fcee0a;
+            border-color: #fcee0a;
+        }
+        .cyber-checkbox:checked::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 1px;
+            width: 5px;
+            height: 10px;
+            border: solid #0d1117;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        .text-cyber-yellow { color: #fcee0a; }
+        .text-cyber-cyan { color: #00f0ff; }
+        .text-cyber-magenta { color: #ff00f5; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-cyber-yellow" style="text-shadow: 0 0 10px #fcee0a;">// Trade Results //</h1>
+            <p class="text-slate-300 mt-2">> Log trades :: Analyze performance :: Achieve gains</p>
+        </header>
+
+        <section id="summary" class="bg-transparent p-6 rounded-xl cyber-card mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-cyber-yellow">> Performance Metrics_</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div id="total-pl-container" class="cyber-card text-center p-4 rounded-lg transition-colors duration-300 col-span-2 md:col-span-3 lg:col-span-1">
+                    <div class="kpi-label">> Total P&L</div>
+                    <div id="totalPL" class="kpi-value text-3xl">$0.00</div>
+                </div>
+                <div class="cyber-card text-center p-4 rounded-lg">
+                    <div class="kpi-label">> Win Rate</div>
+                    <div id="winRate" class="kpi-value text-cyber-cyan">0%</div>
+                </div>
+                <div class="cyber-card text-center p-4 rounded-lg">
+                    <div class="kpi-label">> Profit Factor</div>
+                    <div id="profitFactor" class="kpi-value text-cyber-cyan">0.00</div>
+                </div>
+                <div class="cyber-card text-center p-4 rounded-lg">
+                    <div class="kpi-label">> Avg. Win</div>
+                    <div id="avgWin" class="kpi-value text-cyber-yellow">$0.00</div>
+                </div>
+                <div class="cyber-card text-center p-4 rounded-lg">
+                    <div class="kpi-label">> Avg. Loss</div>
+                    <div id="avgLoss" class="kpi-value text-cyber-magenta">$0.00</div>
+                </div>
+                <div class="cyber-card text-center p-4 rounded-lg col-span-2 md:col-span-3 lg:col-span-5">
+                    <div class="kpi-label">> Total Trades</div>
+                    <div id="totalTrades" class="kpi-value">0</div>
+                </div>
+            </div>
+        </section>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <div class="lg:col-span-2 space-y-8">
+                <section id="entry" class="cyber-card rounded-xl">
+                    <div class="flex border-b border-slate-700">
+                        <button id="manualTabBtn" class="tab-btn p-4 font-semibold border-b-2 border-cyber-yellow text-cyber-yellow">Manual_Entry</button>
+                        <button id="pasteTabBtn" class="tab-btn p-4 font-semibold text-slate-400 hover:text-cyber-yellow border-b-2 border-transparent">Batch_Paste</button>
+                    </div>
+
+                    <div id="manualTabContent" class="p-6">
+                        <form id="transactionForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                            <div>
+                                <label for="date" class="block text-sm font-medium text-slate-300 mb-1">> Date</label>
+                                <input type="date" id="date" name="date" required class="cyber-input w-full p-2 rounded-md">
+                            </div>
+                            <div>
+                                <label for="description" class="block text-sm font-medium text-slate-300 mb-1">> Ticker / Asset</label>
+                                <input type="text" id="description" name="description" placeholder="TSLA" required class="cyber-input w-full p-2 rounded-md">
+                            </div>
+                            <div>
+                                <label for="category" class="block text-sm font-medium text-slate-300 mb-1">> Strategy (Optional)</label>
+                                <input type="text" id="category" name="category" placeholder="Breakout" class="cyber-input w-full p-2 rounded-md">
+                            </div>
+                            <div>
+                                <label for="amount" class="block text-sm font-medium text-slate-300 mb-1">> P&L ($)</label>
+                                <input type="number" id="amount" name="amount" min="0" step="0.01" placeholder="0.00" required class="cyber-input w-full p-2 rounded-md">
+                            </div>
+                            <div class="w-full md:col-span-2 grid grid-cols-2 gap-4">
+                                <div>
+                                     <label class="block text-sm font-medium text-slate-300 mb-1">> Outcome</label>
+                                     <div class="flex items-center space-x-4">
+                                        <label class="flex items-center"><input type="radio" name="type" value="win" checked class="h-4 w-4 text-cyber-yellow focus:ring-yellow-400 bg-gray-700 border-gray-600"> <span class="ml-2 text-slate-200">Win</span></label>
+                                        <label class="flex items-center"><input type="radio" name="type" value="loss" class="h-4 w-4 text-cyber-magenta focus:ring-magenta-500 bg-gray-700 border-gray-600"> <span class="ml-2 text-slate-200">Loss</span></label>
+                                     </div>
+                                </div>
+                                <button type="submit" class="cyber-btn w-full font-semibold py-2 px-4 rounded-md transition-colors duration-200">
+                                    Log_Trade
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div id="pasteTabContent" class="p-6 hidden">
+                        <label for="pasteData" class="block text-sm font-medium text-slate-300 mb-2">> Paste trade data (multiple entries supported):</label>
+                        <textarea id="pasteData" rows="8" class="cyber-input w-full p-3 rounded-md font-mono text-sm" placeholder="Index&#10;1&#10;...&#10;Total P&L&#10;-4.9135 USDT&#10;Index&#10;2&#10;..."></textarea>
+                        <button id="parseAndLogBtn" class="cyber-btn mt-4 w-full font-semibold py-2 px-4 rounded-md transition-colors duration-200">
+                            Parse_&_Log
+                        </button>
+                        <div id="pasteStatus" class="mt-2 text-sm text-center h-4"></div>
+                    </div>
+                </section>
+                
+                <section id="log" class="cyber-card p-6 rounded-xl">
+                    <div class="flex justify-between items-center mb-4">
+                         <h2 class="text-xl font-semibold text-cyber-yellow">> Trade_Log</h2>
+                         <div id="bulk-edit-container" class="hidden">
+                             <div class="flex items-center gap-2">
+                                <input type="text" id="bulk-strategy-input" class="cyber-input p-2 rounded-md text-sm" placeholder="New Strategy">
+                                <button id="bulk-apply-btn" class="cyber-btn font-semibold p-2 rounded-md text-sm">Apply</button>
+                             </div>
+                         </div>
+                    </div>
+                    <div class="h-96 overflow-y-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="sticky top-0" style="background-color: rgba(13, 23, 33, 1);">
+                                <tr>
+                                    <th class="p-3 text-center"><input type="checkbox" id="select-all-checkbox" class="cyber-checkbox"></th>
+                                    <th class="p-3 font-semibold text-slate-300">Date</th>
+                                    <th class="p-3 font-semibold text-slate-300">Ticker</th>
+                                    <th class="p-3 font-semibold text-slate-300">Strategy</th>
+                                    <th class="p-3 font-semibold text-slate-300 text-right">P&L</th>
+                                    <th class="p-3 font-semibold text-slate-300 text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionLogBody">
+                                <tr id="empty-log-row"><td colspan="6" class="text-center p-8 text-slate-400">> NO DATA //</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <aside class="lg:col-span-1 space-y-8">
+                <section class="cyber-card p-6 rounded-xl">
+                    <h2 class="text-xl font-semibold mb-4 text-cyber-yellow">> Data_Management</h2>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button id="export-btn" class="cyber-btn-secondary flex-1 font-semibold p-2 rounded-md text-sm transition-colors duration-200">Export_All</button>
+                        <button id="import-btn" class="cyber-btn-secondary flex-1 font-semibold p-2 rounded-md text-sm transition-colors duration-200">Import_File</button>
+                        <input type="file" id="import-file-input" class="hidden" accept=".txt, .json">
+                    </div>
+                    <div id="data-status" class="mt-2 text-sm text-center h-4 text-cyber-cyan"></div>
+                </section>
+                <section class="cyber-card p-6 rounded-xl">
+                    <h2 class="text-xl font-semibold mb-4 text-cyber-yellow">> Profit_by_Ticker</h2>
+                    <div class="chart-container">
+                        <canvas id="tickerChart"></canvas>
+                    </div>
+                     <p id="empty-ticker-chart-msg" class="text-center p-8 text-slate-400">> NO DATA //</p>
+                </section>
+                <section class="cyber-card p-6 rounded-xl">
+                    <h2 class="text-xl font-semibold mb-4 text-cyber-yellow">> Monthly_P&L</h2>
+                     <div class="chart-container">
+                        <canvas id="trendsChart"></canvas>
+                    </div>
+                    <p id="empty-trends-chart-msg" class="text-center p-8 text-slate-400">> NO DATA //</p>
+                </section>
+            </aside>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const transactionForm = document.getElementById('transactionForm');
+            const transactionLogBody = document.getElementById('transactionLogBody');
+            
+            const totalPLEl = document.getElementById('totalPL');
+            const totalPlContainer = document.getElementById('total-pl-container');
+            const winRateEl = document.getElementById('winRate');
+            const profitFactorEl = document.getElementById('profitFactor');
+            const avgWinEl = document.getElementById('avgWin');
+            const avgLossEl = document.getElementById('avgLoss');
+            const totalTradesEl = document.getElementById('totalTrades');
+
+            const manualTabBtn = document.getElementById('manualTabBtn');
+            const pasteTabBtn = document.getElementById('pasteTabBtn');
+            const manualTabContent = document.getElementById('manualTabContent');
+            const pasteTabContent = document.getElementById('pasteTabContent');
+            const parseAndLogBtn = document.getElementById('parseAndLogBtn');
+            const pasteDataEl = document.getElementById('pasteData');
+            const pasteStatusEl = document.getElementById('pasteStatus');
+            
+            const bulkEditContainer = document.getElementById('bulk-edit-container');
+            const bulkStrategyInput = document.getElementById('bulk-strategy-input');
+            const bulkApplyBtn = document.getElementById('bulk-apply-btn');
+            const selectAllCheckbox = document.getElementById('select-all-checkbox');
+            
+            const exportBtn = document.getElementById('export-btn');
+            const importBtn = document.getElementById('import-btn');
+            const importFileInput = document.getElementById('import-file-input');
+            const dataStatusEl = document.getElementById('data-status');
+
+            let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+            let selectedTradeIds = new Set();
+            let tickerChart;
+            let trendsChart;
+
+            const formatCurrency = (amount) => {
+                return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+            };
+
+            const renderTransactions = () => {
+                transactionLogBody.innerHTML = '';
+                if (transactions.length === 0) {
+                    transactionLogBody.innerHTML = `<tr id="empty-log-row"><td colspan="6" class="text-center p-8 text-slate-400">> NO DATA //</td></tr>`;
+                    return;
+                }
+                const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+                sortedTransactions.forEach(t => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-slate-700 hover:bg-slate-800/50';
+                    const amountClass = t.type === 'win' ? 'text-cyber-yellow' : 'text-cyber-magenta';
+
+                    row.innerHTML = `
+                        <td class="p-3 text-center"><input type="checkbox" data-id="${t.id}" class="cyber-checkbox trade-checkbox" ${selectedTradeIds.has(t.id) ? 'checked' : ''}></td>
+                        <td class="p-3">${new Date(t.date).toLocaleDateString()}</td>
+                        <td class="p-3 font-semibold text-slate-200">${t.description}</td>
+                        <td class="p-3 text-slate-300 strategy-cell cursor-pointer hover:bg-slate-700" data-id="${t.id}">${t.category || 'N/A'}</td>
+                        <td class="p-3 font-medium text-right ${amountClass}">${t.type === 'win' ? '+' : '-'}${formatCurrency(t.amount)}</td>
+                        <td class="p-3 text-center">
+                            <button data-id="${t.id}" class="delete-btn text-slate-400 hover:text-red-500" title="Delete">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </td>
+                    `;
+                    transactionLogBody.appendChild(row);
+                });
+            };
+            
+            const updateDashboard = () => {
+                const winningTrades = transactions.filter(t => t.type === 'win');
+                const losingTrades = transactions.filter(t => t.type === 'loss');
+                const totalProfit = winningTrades.reduce((sum, t) => sum + t.amount, 0);
+                const totalLoss = losingTrades.reduce((sum, t) => sum + t.amount, 0);
+                const totalPL = totalProfit - totalLoss;
+                const totalTrades = transactions.length;
+                const winRate = totalTrades > 0 ? (winningTrades.length / totalTrades) * 100 : 0;
+                const profitFactor = totalLoss > 0 ? totalProfit / totalLoss : 0;
+                const avgWin = winningTrades.length > 0 ? totalProfit / winningTrades.length : 0;
+                const avgLoss = losingTrades.length > 0 ? totalLoss / losingTrades.length : 0;
+                
+                totalPLEl.textContent = formatCurrency(totalPL);
+                winRateEl.textContent = `${winRate.toFixed(1)}%`;
+                profitFactorEl.textContent = profitFactor.toFixed(2);
+                avgWinEl.textContent = formatCurrency(avgWin);
+                avgLossEl.textContent = formatCurrency(avgLoss);
+                totalTradesEl.textContent = totalTrades;
+                
+                totalPlContainer.classList.remove('bg-yellow-900/50', 'bg-fuchsia-900/50', 'bg-slate-800/50');
+                totalPLEl.classList.remove('text-cyber-yellow', 'text-cyber-magenta', 'text-slate-300');
+
+                if (totalPL > 0) {
+                    totalPlContainer.classList.add('bg-yellow-900/50');
+                    totalPLEl.classList.add('text-cyber-yellow');
+                } else if (totalPL < 0) {
+                    totalPlContainer.classList.add('bg-fuchsia-900/50');
+                    totalPLEl.classList.add('text-cyber-magenta');
+                } else {
+                     totalPlContainer.classList.add('bg-slate-800/50');
+                     totalPLEl.classList.add('text-slate-300');
+                }
+            };
+            
+            const chartDefaultOptions = {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#b1bac4', font: { family: "'Roboto Mono', monospace" }}},
+                    tooltip: {
+                        titleFont: { family: "'Roboto Mono', monospace" },
+                        bodyFont: { family: "'Roboto Mono', monospace" },
+                        callbacks: { label: (context) => `${context.label}: ${formatCurrency(context.raw)}` }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { color: '#b1bac4', callback: (value) => formatCurrency(value) }, grid: { color: 'rgba(177, 186, 196, 0.2)' } },
+                    x: { ticks: { color: '#b1bac4' }, grid: { color: 'rgba(177, 186, 196, 0.2)' } }
+                }
+            };
+            
+            const createOrUpdateCharts = () => {
+                createOrUpdateTickerChart();
+                createOrUpdateTrendsChart();
+            };
+
+            const createOrUpdateTickerChart = () => {
+                const winningTrades = transactions.filter(t => t.type === 'win');
+                const tickerData = winningTrades.reduce((acc, t) => {
+                    acc[t.description] = (acc[t.description] || 0) + t.amount;
+                    return acc;
+                }, {});
+                const tickerChartEl = document.getElementById('tickerChart');
+                const emptyMsg = document.getElementById('empty-ticker-chart-msg');
+                if (Object.keys(tickerData).length === 0) {
+                    tickerChartEl.style.display = 'none';
+                    emptyMsg.style.display = 'block';
+                    if (tickerChart) { tickerChart.destroy(); tickerChart = null; }
+                    return;
+                }
+                tickerChartEl.style.display = 'block';
+                emptyMsg.style.display = 'none';
+                const labels = Object.keys(tickerData);
+                const data = Object.values(tickerData);
+                const backgroundColors = ['#fcee0a', '#00f0ff', '#ff00f5', '#ff8d00', '#76e469', '#c400ff'];
+                const chartData = {
+                    labels: labels,
+                    datasets: [{ data: data, backgroundColor: labels.map((_, i) => backgroundColors[i % backgroundColors.length]), borderColor: '#0d1117', hoverOffset: 4 }]
+                };
+                if (tickerChart) {
+                    tickerChart.data = chartData;
+                    tickerChart.update();
+                } else {
+                    const ctx = tickerChartEl.getContext('2d');
+                    tickerChart = new Chart(ctx, { type: 'doughnut', data: chartData, options: chartDefaultOptions });
+                }
+            };
+
+            const createOrUpdateTrendsChart = () => {
+                const trendsData = transactions.reduce((acc, t) => {
+                    const month = new Date(t.date).toISOString().slice(0, 7);
+                    if (!acc[month]) acc[month] = { win: 0, loss: 0 };
+                    acc[month][t.type] += t.amount;
+                    return acc;
+                }, {});
+                const trendsChartEl = document.getElementById('trendsChart');
+                const emptyMsg = document.getElementById('empty-trends-chart-msg');
+                if (Object.keys(trendsData).length < 2) {
+                    trendsChartEl.style.display = 'none';
+                    emptyMsg.style.display = 'block';
+                    if(trendsChart) { trendsChart.destroy(); trendsChart = null; }
+                    return;
+                }
+                trendsChartEl.style.display = 'block';
+                emptyMsg.style.display = 'none';
+                const sortedMonths = Object.keys(trendsData).sort();
+                const labels = sortedMonths.map(m => new Date(m + '-02').toLocaleString('default', { month: 'short', year: '2-digit' }));
+                const profitData = sortedMonths.map(m => trendsData[m].win);
+                const lossData = sortedMonths.map(m => trendsData[m].loss);
+                const chartData = {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Total Profit', data: profitData, borderColor: '#fcee0a', backgroundColor: 'rgba(252, 238, 10, 0.2)', fill: true, tension: 0.3 },
+                        { label: 'Total Loss', data: lossData, borderColor: '#ff00f5', backgroundColor: 'rgba(255, 0, 245, 0.2)', fill: true, tension: 0.3 }
+                    ]
+                };
+                if (trendsChart) {
+                    trendsChart.data = chartData;
+                    trendsChart.update();
+                } else {
+                    const ctx = trendsChartEl.getContext('2d');
+                    trendsChart = new Chart(ctx, { type: 'line', data: chartData, options: chartDefaultOptions });
+                }
+            };
+
+            const addTransactionFromForm = (e) => {
+                e.preventDefault();
+                const formData = new FormData(transactionForm);
+                const newTransaction = {
+                    id: Date.now(),
+                    date: formData.get('date'),
+                    description: formData.get('description').toUpperCase(),
+                    category: formData.get('category'),
+                    amount: parseFloat(formData.get('amount')),
+                    type: formData.get('type')
+                };
+                addTrades([newTransaction]);
+                transactionForm.reset();
+                document.getElementById('date').valueAsDate = new Date();
+            };
+
+            const addTrades = (newTrades) => {
+                if (!newTrades || newTrades.length === 0) return;
+                transactions.push(...newTrades);
+                saveAndRerender();
+            };
+            
+            const deleteTransaction = (id) => {
+                transactions = transactions.filter(t => t.id !== id);
+                selectedTradeIds.delete(id);
+                saveAndRerender();
+            };
+            
+            const saveAndRerender = () => {
+                localStorage.setItem('transactions', JSON.stringify(transactions));
+                updateAll();
+            };
+
+            const parsePastedText = (text) => {
+                const tradeBlocks = text.split(/Index\s*\n/).filter(block => block.trim() !== '');
+                const parsedTrades = [];
+                tradeBlocks.forEach(block => {
+                    const lines = block.split('\n').map(line => line.trim());
+                    const data = {};
+                    try {
+                        const findValue = (key) => {
+                            const index = lines.findIndex(line => line.toLowerCase() === key.toLowerCase());
+                            return (index > -1 && lines[index + 1]) ? lines[index + 1] : null;
+                        };
+                        const closingTime = findValue('Closing Time');
+                        if (closingTime) data.date = closingTime.split(' ')[0];
+                        const positionSize = findValue('Position Size');
+                        if (positionSize) {
+                            const parts = positionSize.split(' ');
+                            data.description = parts.length > 1 ? parts.slice(1).join(' ').toUpperCase() : 'N/A';
+                        }
+                        const pnl = findValue('Total P&L');
+                        if (pnl) {
+                            const pnlValue = parseFloat(pnl.replace(/[^\d.-]/g, ''));
+                            data.amount = Math.abs(pnlValue);
+                            data.type = pnlValue >= 0 ? 'win' : 'loss';
+                        }
+                        if (!data.date || !data.description || isNaN(data.amount)) return;
+                        data.id = Date.now() + parsedTrades.length;
+                        data.category = 'Pasted';
+                        parsedTrades.push(data);
+                    } catch (error) { console.error("Parsing error on block:", error); }
+                });
+                return parsedTrades;
+            };
+
+            const handleParseAndLog = () => {
+                const text = pasteDataEl.value;
+                if (!text.trim()) {
+                    showPasteStatus('> Text area is empty.', 'error'); return;
+                }
+                const newTrades = parsePastedText(text);
+                if (newTrades.length > 0) {
+                    addTrades(newTrades);
+                    pasteDataEl.value = '';
+                    showPasteStatus(`> Logged ${newTrades.length} trade(s) successfully!`, 'success');
+                } else {
+                    showPasteStatus('> Could not parse text. Check format.', 'error');
+                }
+            };
+            
+            const handleSelectionChange = () => {
+                bulkEditContainer.classList.toggle('hidden', selectedTradeIds.size === 0);
+                const allCheckboxes = document.querySelectorAll('.trade-checkbox');
+                selectAllCheckbox.checked = allCheckboxes.length > 0 && allCheckboxes.length === selectedTradeIds.size;
+            };
+            
+            const handleLogClick = (e) => {
+                if (e.target.matches('.delete-btn, .delete-btn *')) {
+                    deleteTransaction(parseInt(e.target.closest('.delete-btn').dataset.id));
+                } else if (e.target.matches('.trade-checkbox')) {
+                    const id = parseInt(e.target.dataset.id);
+                    if (e.target.checked) selectedTradeIds.add(id); else selectedTradeIds.delete(id);
+                    handleSelectionChange();
+                } else if (e.target.matches('.strategy-cell')) {
+                    makeStrategyEditable(e.target);
+                }
+            };
+            
+            const makeStrategyEditable = (cell) => {
+                if (cell.querySelector('input')) return;
+                const id = parseInt(cell.dataset.id);
+                const currentStrategy = cell.textContent;
+                cell.innerHTML = `<input type="text" value="${currentStrategy}" class="cyber-input w-full p-1 text-sm">`;
+                const input = cell.querySelector('input');
+                input.focus();
+                input.select();
+                input.addEventListener('blur', () => saveStrategyEdit(id, input.value));
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') input.blur();
+                    if (e.key === 'Escape') saveStrategyEdit(id, currentStrategy);
+                });
+            };
+            
+            const saveStrategyEdit = (id, newStrategy) => {
+                const trade = transactions.find(t => t.id === id);
+                if (trade) {
+                    trade.category = newStrategy;
+                    saveAndRerender();
+                }
+            };
+            
+            const handleBulkApply = () => {
+                const newStrategy = bulkStrategyInput.value;
+                if (!newStrategy.trim()) return;
+                transactions.forEach(t => {
+                    if (selectedTradeIds.has(t.id)) t.category = newStrategy;
+                });
+                selectedTradeIds.clear();
+                bulkStrategyInput.value = '';
+                saveAndRerender();
+            };
+
+            const showPasteStatus = (message, type) => {
+                pasteStatusEl.textContent = message;
+                pasteStatusEl.className = `mt-2 text-sm text-center h-4 ${type === 'success' ? 'text-cyber-yellow' : 'text-cyber-magenta'}`;
+                setTimeout(() => { pasteStatusEl.textContent = ''; }, 4000);
+            };
+
+            const showDataStatus = (message, type = 'success') => {
+                 dataStatusEl.textContent = message;
+                 dataStatusEl.className = `mt-2 text-sm text-center h-4 ${type === 'success' ? 'text-cyber-cyan' : 'text-cyber-magenta'}`;
+                 setTimeout(() => { dataStatusEl.textContent = ''; }, 4000);
+            };
+
+            const handleExport = () => {
+                if (transactions.length === 0) {
+                    showDataStatus('> No data to export.', 'error');
+                    return;
+                }
+                const dataStr = JSON.stringify(transactions, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'trade_results_master.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showDataStatus('> Trades exported successfully.');
+            };
+
+            const handleImport = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const importedTransactions = JSON.parse(event.target.result);
+                        if (!Array.isArray(importedTransactions)) throw new Error('Not an array');
+                        transactions = importedTransactions;
+                        saveAndRerender();
+                        showDataStatus(`> Imported ${transactions.length} trades.`);
+                    } catch (err) {
+                        showDataStatus('> Invalid file format.', 'error');
+                    }
+                };
+                reader.readAsText(file);
+                importFileInput.value = '';
+            };
+
+            const switchTabs = (isManual) => {
+                manualTabContent.classList.toggle('hidden', !isManual);
+                pasteTabContent.classList.toggle('hidden', isManual);
+                manualTabBtn.classList.toggle('border-cyber-yellow', isManual);
+                manualTabBtn.classList.toggle('text-cyber-yellow', isManual);
+                manualTabBtn.classList.toggle('text-slate-400', !isManual);
+                manualTabBtn.classList.toggle('border-transparent', !isManual);
+                pasteTabBtn.classList.toggle('border-cyber-yellow', !isManual);
+                pasteTabBtn.classList.toggle('text-cyber-yellow', !isManual);
+                pasteTabBtn.classList.toggle('text-slate-400', isManual);
+                pasteTabBtn.classList.toggle('border-transparent', isManual);
+            };
+            
+            const updateAll = () => {
+                renderTransactions();
+                updateDashboard();
+                createOrUpdateCharts();
+                handleSelectionChange();
+            };
+
+            transactionForm.addEventListener('submit', addTransactionFromForm);
+            transactionLogBody.addEventListener('click', handleLogClick);
+            manualTabBtn.addEventListener('click', () => switchTabs(true));
+            pasteTabBtn.addEventListener('click', () => switchTabs(false));
+            parseAndLogBtn.addEventListener('click', handleParseAndLog);
+            bulkApplyBtn.addEventListener('click', handleBulkApply);
+            selectAllCheckbox.addEventListener('change', (e) => {
+                const allIds = transactions.map(t => t.id);
+                if (e.target.checked) selectedTradeIds = new Set(allIds);
+                else selectedTradeIds.clear();
+                updateAll();
+            });
+            exportBtn.addEventListener('click', handleExport);
+            importBtn.addEventListener('click', () => importFileInput.click());
+            importFileInput.addEventListener('change', handleImport);
+
+            document.getElementById('date').valueAsDate = new Date();
+            updateAll();
+        });
+    </script>
+
+</body>
+</html>
